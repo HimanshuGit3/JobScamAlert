@@ -32,8 +32,23 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
   return (await response.json()) as T;
 }
 
+/**
+ * Static build (GitHub Pages, `VITE_STATIC_MODE=true`): there is no backend, so the
+ * deterministic engine runs in the browser. It is loaded lazily, so the server
+ * build never downloads it.
+ */
+const STATIC_MODE = import.meta.env.VITE_STATIC_MODE === "true";
+
 /** POST /api/scan */
-export function scan(text: string, url: string | null): Promise<ScanReport> {
+export async function scan(text: string, url: string | null): Promise<ScanReport> {
+  if (STATIC_MODE) {
+    const { scanInBrowser } = await import("./engine/scan");
+    try {
+      return await scanInBrowser(text, url);
+    } catch (error) {
+      throw new ApiError(error instanceof Error ? error.message : "The scan failed. Please try again.");
+    }
+  }
   return request<ScanReport>("/api/scan", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -42,11 +57,13 @@ export function scan(text: string, url: string | null): Promise<ScanReport> {
 }
 
 /** GET /api/samples */
-export function getSamples(): Promise<Sample[]> {
+export async function getSamples(): Promise<Sample[]> {
+  if (STATIC_MODE) return (await import("./engine/samples")).SAMPLES;
   return request<Sample[]>("/api/samples");
 }
 
 /** GET /api/status */
-export function getStatus(): Promise<IntegrationStatus> {
+export async function getStatus(): Promise<IntegrationStatus> {
+  if (STATIC_MODE) return { gemini: false, safe_browsing: false, model: "", fetch_linked_pages: false };
   return request<IntegrationStatus>("/api/status");
 }

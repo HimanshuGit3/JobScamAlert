@@ -11,7 +11,7 @@ from dotenv import load_dotenv
 
 DEFAULT_GEMINI_MODEL = "gemini-3.8-flash"
 # Tried once if the primary model is overloaded/unavailable; "none" disables.
-DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.6-flash"
+DEFAULT_GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite"  # fast (~2s) and available when larger models are overloaded
 ENV_FILE = Path(__file__).resolve().parent.parent / ".env"
 
 

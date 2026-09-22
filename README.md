@@ -9,7 +9,7 @@ Gemini reads the letter. Deterministic code scores it. Every point can be traced
 
 [![CI](https://img.shields.io/badge/CI-GitHub_Actions-2088FF?logo=githubactions&logoColor=white)](.github/workflows/ci.yml)
 ![Backend tests](https://img.shields.io/badge/backend_tests-238_passing-2ea44f)
-![Frontend tests](https://img.shields.io/badge/frontend_tests-23_passing-2ea44f)
+![Frontend tests](https://img.shields.io/badge/frontend_tests-29_passing-2ea44f)
 ![Coverage](https://img.shields.io/badge/coverage-96%25-2ea44f)
 ![mypy](https://img.shields.io/badge/mypy-strict-1f5082)
 ![Ruff](https://img.shields.io/badge/lint-ruff_+_bandit-D7FF64)
@@ -25,7 +25,8 @@ Gemini reads the letter. Deterministic code scores it. Every point can be traced
 
 **Built for PromptWars × Gen AI Club (Google for Developers × Hack2skill), Round 1**
 
-**Live demo:** `https://<your-cloud-run-url>` *(add after deploying)*
+**🌐 Live demo (GitHub Pages):** **[https://himanshugit3.github.io/JobScamAlert/](https://himanshugit3.github.io/JobScamAlert/)**  
+<sub>The Pages demo runs the deterministic engine and live RDAP domain-age checks in your browser; Gemini and Safe Browsing need the Cloud Run server build.</sub>
 
 </div>
 
@@ -43,7 +44,7 @@ Gemini reads the letter. Deterministic code scores it. Every point can be traced
 | 🧠 **AI design** | **Gemini extracts facts, code does the scoring.** Strict JSON schema, `temperature=0`, every quote checked against the input, protected against prompt injection. Same input, same score, every time. |
 | ☁️ **Google stack** | Gemini API (`google-genai` SDK) · Safe Browsing v4 · Cloud Run · Secret Manager |
 | 🔒 **Security** | SSRF-safe fetcher with DNS pinning, strict CSP with no `unsafe-inline`, rate limiting, body caps, nothing stored or logged, non-root container |
-| ✅ **Quality** | **261 automated tests** (238 backend + 23 frontend), **96 % coverage**, `mypy --strict`, Ruff + Bandit rules, CI on every push |
+| ✅ **Quality** | **267 automated tests** (238 backend + 29 frontend), **96 % coverage**, `mypy --strict`, Ruff + Bandit rules, CI on every push |
 | ♿ **Accessibility** | WCAG AA contrast, colour is never the only cue, screen-reader live regions, keyboard-first, `prefers-reduced-motion` respected |
 | 🧯 **Resilience** | Keeps working without any API key. Failed checks are listed in the UI as "skipped", and a fallback Gemini model takes over when the primary is overloaded |
 
@@ -296,6 +297,7 @@ app/
 frontend/          React 19 + TypeScript + Motion UI (Vite build to frontend/dist)
   src/components/  TopBar · Hero · ScannerCard · ScanProgress · ResultPanel · Gauge · SignalCard · HighlightedText · Advice · Background
   src/lib/         highlight ranges, risk bands (unit-tested)
+  src/engine/      in-browser port of the deterministic checks + scoring for the static GitHub Pages build (parity-tested)
 tests/             238 backend tests, no network
 scripts/           try_extraction.py (manual live Gemini smoke test)
 ```
@@ -306,7 +308,7 @@ scripts/           try_extraction.py (manual live Gemini smoke test)
 
 | Service | Used for | Why |
 |---|---|---|
-| **Gemini API** via the official `google-genai` SDK (`client.aio.models.generate_content`) | Reading the letter into a strict JSON schema (`response_schema` = pydantic model, `temperature=0`) | Understands paraphrased scam patterns ("confirm by Friday", "laptop security amount") that regexes miss. Model set by `GEMINI_MODEL` (default `gemini-3.8-flash` for speed and cost), with `GEMINI_FALLBACK_MODEL` (default `gemini-3.6-flash`) tried once if the primary is unavailable |
+| **Gemini API** via the official `google-genai` SDK (`client.aio.models.generate_content`) | Reading the letter into a strict JSON schema (`response_schema` = pydantic model, `temperature=0`) | Understands paraphrased scam patterns ("confirm by Friday", "laptop security amount") that regexes miss. Model set by `GEMINI_MODEL` (default `gemini-3.8-flash` for speed and cost), with `GEMINI_FALLBACK_MODEL` (default `gemini-3.5-flash-lite`) tried once if the primary is unavailable |
 | **Google Safe Browsing API v4** (`threatMatches:find`) | Reputation of every URL in the letter | Authoritative phishing and malware list; a hit is the strongest signal (40 points). The key is sent in the `x-goog-api-key` header, never in the URL |
 | **Google Cloud Run** | Hosting the single container | Scales to zero, HTTPS by default, secrets from Secret Manager, deploys straight from source |
 | **Secret Manager** | Storing the two API keys for Cloud Run | Keys never live in code, images or plain environment files |
@@ -375,13 +377,15 @@ mypy                  # strict type-checking of app/
 
 cd frontend
 npm ci
-npm test              # 23 Vitest + Testing Library tests
+npm test              # 29 Vitest + Testing Library tests
 npm run typecheck     # strict TypeScript
 ```
 
 **All external APIs are mocked:** Gemini with a fake client (`tests/fakes.py`), and RDAP, Safe Browsing and the URL fetcher with `httpx.MockTransport` and a fake DNS resolver.
 
 ### CI pipeline (`.github/workflows/ci.yml`, on every push and pull request)
+
+A second workflow, `.github/workflows/pages.yml`, runs the frontend tests and publishes the static in-browser build to GitHub Pages on every push to `main`.
 
 ```mermaid
 flowchart LR
@@ -390,7 +394,7 @@ flowchart LR
         B1[pip install] --> B2[ruff check] --> B3[mypy --strict] --> B4[pytest --cov<br/>238 tests, offline]
     end
     subgraph FE[Frontend job · Node 24]
-        F1[npm ci] --> F2[tsc typecheck] --> F3[Vitest<br/>23 tests] --> F4[vite build]
+        F1[npm ci] --> F2[tsc typecheck] --> F3[Vitest<br/>29 tests] --> F4[vite build]
     end
     BE --> C[Container job<br/>docker build]
     FE --> C
@@ -412,6 +416,7 @@ flowchart LR
 | `test_safe_browsing.py` | 5 | Request shape, key in header, missing key / errors → skipped |
 | `frontend/src/App.test.tsx` | 11 | Validation, integration pills, results flow, re-scanning after a result (regression), user text wins over samples, focus management, live region, XSS payload stays inert, 429 message, `aria-expanded` |
 | `frontend/src/lib/*.test.ts` | 12 | Highlight range merging and segmenting, band thresholds match the backend |
+| `frontend/src/engine/scan.test.ts` | 6 | In-browser engine gives the **same scores as the Python backend** for every sample, RDAP age signal, skipped server-only checks, input validation |
 
 To try **live** Gemini extraction on a sample (makes real API calls):
 ```bash
@@ -445,7 +450,8 @@ All keys are optional. Without them the app runs on the deterministic checks and
 |---|---|---|
 | `GEMINI_API_KEY` | – | Enables Gemini extraction ([get a key](https://aistudio.google.com/apikey)) |
 | `GEMINI_MODEL` | `gemini-3.8-flash` | Any current Gemini Flash model ID |
-| `GEMINI_FALLBACK_MODEL` | `gemini-3.6-flash` | Tried once if the primary model is overloaded or unavailable; `none` disables it |
+| `GEMINI_FALLBACK_MODEL` | `gemini-3.5-flash-lite` | Tried once if the main model is overloaded (HTTP 429/5xx), retired (404), or slow (gets 40% of the timeout); `none` disables it |
+| `GEMINI_FALLBACK_MODEL` | `gemini-3.5-flash-lite` | Tried once if the primary model is overloaded or unavailable; `none` disables it |
 | `GEMINI_TIMEOUT_SECONDS` | `20` | Upper bound for the Gemini call (fallback included) |
 | `SAFE_BROWSING_API_KEY` | – | Enables Safe Browsing |
 | `RATE_LIMIT_PER_MINUTE` | `10` | Scans per client IP per minute |

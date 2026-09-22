@@ -7,6 +7,7 @@ highlight it.
 """
 
 import re
+from functools import lru_cache
 
 from app.checks.data import BARE_DOMAIN_TLDS
 
@@ -86,9 +87,16 @@ def _strip_trailing(value: str) -> str:
     return value.rstrip(_TRAILING_PUNCT)
 
 
+@lru_cache(maxsize=16)
+def _sentences(text: str) -> tuple[str, ...]:
+    """Cached split: three detectors read the same text in one scan, so the
+    (up to 20,000-char) regex split runs once instead of three times."""
+    return tuple(s.strip() for s in _SENTENCE_SPLIT_RE.split(text) if s and s.strip())
+
+
 def split_sentences(text: str) -> list[str]:
     """Split text into sentences; every returned item is a substring of `text`."""
-    return [s.strip() for s in _SENTENCE_SPLIT_RE.split(text) if s and s.strip()]
+    return list(_sentences(text))
 
 
 def extract_emails(text: str) -> list[str]:
@@ -115,7 +123,7 @@ def _matching_sentences(text: str, *patterns: re.Pattern[str]) -> list[str]:
     """Sentences matching any of `patterns`, truncated for display."""
     return _dedupe([
         s[:MAX_EVIDENCE_CHARS]
-        for s in split_sentences(text)
+        for s in _sentences(text)
         if any(p.search(s) for p in patterns)
     ])
 
@@ -138,7 +146,7 @@ def detect_sensitive_document_requests(text: str) -> list[str]:
     requests always count: no employer legitimately needs them.
     """
     hits: list[str] = []
-    for sentence in split_sentences(text):
+    for sentence in _sentences(text):
         if _ALWAYS_SENSITIVE_RE.search(sentence) or (
             _SENSITIVE_DOC_RE.search(sentence)
             and _REQUEST_VERB_RE.search(sentence)

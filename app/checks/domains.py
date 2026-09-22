@@ -27,6 +27,12 @@ _PRODUCT_MENTION_RE = re.compile(
     r"paytm\s+(?:app|wallet)|jio\s*(?:meet|sim))\b",
     re.IGNORECASE,
 )
+# One precompiled whole-word pattern per brand, built once at import instead of
+# compiling a regex per alias on every call.
+_BRAND_ALIAS_RES: tuple[tuple[Brand, re.Pattern[str]], ...] = tuple(
+    (brand, re.compile(r"\b(?:" + "|".join(re.escape(a) for a in brand.aliases) + r")\b"))
+    for brand in KNOWN_BRANDS
+)
 
 
 def host_of(url: str) -> str | None:
@@ -117,6 +123,9 @@ def _imitates(label: str, token: str) -> bool:
         return True
     if len(token) >= _SHORT_TOKEN_LEN:
         allowed = 2 if len(token) >= 8 else 1
+        # Edit distance is at least the length gap: skip the O(n*m) DP when it can't match.
+        if abs(len(compact) - len(token)) > allowed:
+            return False
         return 0 < levenshtein(compact, token) <= allowed
     return False
 
@@ -147,10 +156,7 @@ def find_free_email_senders(emails: list[str]) -> list[str]:
 def brands_mentioned(text: str) -> list[Brand]:
     """Known brands whose name appears in the text as a whole word."""
     lowered = text.lower()
-    return [
-        brand for brand in KNOWN_BRANDS
-        if any(re.search(rf"\b{re.escape(alias)}\b", lowered) for alias in brand.aliases)
-    ]
+    return [brand for brand, pattern in _BRAND_ALIAS_RES if pattern.search(lowered)]
 
 
 def claimed_brands(company_name: str | None, text: str) -> list[Brand]:
