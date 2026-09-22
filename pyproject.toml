@@ -1,0 +1,35 @@
+[project]
+name = "offer-letter-inspector"
+version = "1.0.0"
+description = "Explainable scam detector for fake job offers, appointment letters and rental deposit traps."
+requires-python = ">=3.11"
+license = "MIT"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+asyncio_mode = "auto"
+filterwarnings = [
+    # Emitted inside Starlette's own TestClient module, not by this project.
+    "ignore::DeprecationWarning:starlette.testclient",
+    "ignore:Using `httpx` with `starlette.testclient`",
+]
+
+[tool.coverage.run]
+source = ["app"]
+
+[tool.ruff]
+line-length = 120
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP", "S", "SIM", "RUF", "ASYNC", "BLE"]
+ignore = ["RUF001", "RUF002", "RUF003"]  # ₹ and typographic quotes are intentional
+
+[tool.ruff.lint.per-file-ignores]
+"tests/*" = ["S101", "S105", "S106"]  # asserts and dummy keys in tests
+
+[tool.mypy]
+python_version = "3.11"
+strict = true
+packages = ["app"]
